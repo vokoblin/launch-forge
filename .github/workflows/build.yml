@@ -1,0 +1,100 @@
+name: Build LaunchForge
+
+on:
+  push:
+    tags:
+      - 'v*' # Run on version tags (v1.0.0, etc.)
+    branches:
+      - main # Optional: also build on pushes to main branch
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  build:
+    name: Build All Platforms
+    runs-on: ubuntu-latest # Use Ubuntu for building all platforms
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.9
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+          pip install -r requirements.txt
+          # Install dependencies needed for PyQt5/xcb
+          sudo apt-get update
+          sudo apt-get install -y libxcb-xinerama0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-xkb1 libxkbcommon-x11-0 libxcb-shape0
+
+      - name: Run build script
+        run: |
+          # Run the build.py script for Linux and macOS only
+          python build.py linux macos
+
+      - name: Upload Linux executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: LaunchForge-Linux
+          path: dist/linux/LaunchForge
+
+      - name: Upload macOS executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: LaunchForge-MacOS
+          path: dist/macos/LaunchForge
+
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.9
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller==6.1.0
+          pip install -r requirements.txt
+
+      - name: Run build script
+        run: |
+          # Run the build.py script for Windows only
+          python build.py windows
+
+      - name: Upload Windows executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: LaunchForge-Windows
+          path: dist/windows/LaunchForge.exe
+
+  release:
+    name: Create GitHub Release
+    needs: [build, build-windows]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: LaunchForge ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          files: |
+            LaunchForge-Windows/LaunchForge.exe
+            LaunchForge-Linux/LaunchForge
+            LaunchForge-MacOS/LaunchForge
