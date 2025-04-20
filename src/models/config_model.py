@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Optional
 from datetime import datetime
 
+from src.models.constants import APP_NAME, APP_VERSION
+
 @dataclass
 class ModConfig:
     """
@@ -87,6 +89,7 @@ class LauncherConfig:
             "validation_files": self.validation_files,
             "default_locations": self.default_locations,
             "target_os": self.target_os,
+            "created_with": f"{APP_NAME} v{APP_VERSION}",
             "created": self.created,
             "updated": datetime.now().isoformat()
         }

@@ -29,27 +29,29 @@ def get_platform() -> str:
     else:
         return system
 
-def is_pyinstaller_available() -> bool:
+def get_resource_path(relative_path):
     """
-    Check if PyInstaller is available.
-    
+    Get absolute path to resource, works for development and for PyInstaller frozen builds.
+
+    Args:
+        relative_path: Path relative to either the base directory or _MEIPASS
+
     Returns:
-        bool: True if PyInstaller is available
+        str: Absolute path to the resource
     """
     try:
-        subprocess.run(
-            ["pyinstaller", "--version"], 
-            stdout=subprocess.PIPE, 
-            stderr=subprocess.PIPE
-        )
-        return True
-    except (subprocess.SubprocessError, FileNotFoundError):
-        return False
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        # We are running in normal development mode
+        base_path = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+
+    return os.path.join(base_path, relative_path)
 
 def get_python_version() -> Tuple[int, int, int]:
     """
     Get the current Python version.
-    
+
     Returns:
         Tuple[int, int, int]: Major, minor, and micro version numbers
     """
@@ -58,12 +60,12 @@ def get_python_version() -> Tuple[int, int, int]:
 def get_executable_extension() -> str:
     """
     Get the appropriate executable extension for the current platform.
-    
+
     Returns:
         str: Executable extension (e.g., '.exe' on Windows)
     """
     platform_name = get_platform()
-    
+
     if platform_name == 'windows':
         return '.exe'
     elif platform_name == 'macos':
@@ -74,10 +76,10 @@ def get_executable_extension() -> str:
 def open_file_explorer(path: str) -> bool:
     """
     Open the system file explorer at the specified path.
-    
+
     Args:
         path: Directory path to open
-        
+
     Returns:
         bool: True if successful
     """
@@ -96,10 +98,10 @@ def open_file_explorer(path: str) -> bool:
 def open_url(url: str) -> bool:
     """
     Open a URL in the default web browser.
-    
+
     Args:
         url: URL to open
-        
+
     Returns:
         bool: True if successful
     """
@@ -118,17 +120,17 @@ def open_url(url: str) -> bool:
 def launch_executable(path: str, args: Optional[List[str]] = None) -> bool:
     """
     Launch an executable file.
-    
+
     Args:
         path: Path to the executable
         args: Optional list of command-line arguments
-        
+
     Returns:
         bool: True if successful
     """
     if args is None:
         args = []
-    
+
     try:
         if get_platform() == 'windows':
             if args:
@@ -145,7 +147,7 @@ def launch_executable(path: str, args: Optional[List[str]] = None) -> bool:
 def get_temp_directory() -> str:
     """
     Get the system temporary directory.
-    
+
     Returns:
         str: Path to the temp directory
     """
@@ -155,7 +157,7 @@ def get_temp_directory() -> str:
 def is_admin() -> bool:
     """
     Check if the current process has administrator/root privileges.
-    
+
     Returns:
         bool: True if running with elevated privileges
     """
@@ -171,7 +173,7 @@ def is_admin() -> bool:
 def get_platform_encoding() -> str:
     """
     Get the default encoding for the current platform.
-    
+
     Returns:
         str: Default encoding (e.g., 'utf-8')
     """

@@ -1,0 +1,2 @@
+# This file exists to ensure the templates/bin directory is committed to Git
+# Pre-built launcher templates will be stored in this directory

@@ -51,18 +51,6 @@ EXECUTABLE_EXTENSIONS: Dict[str, str] = {
     "linux": ""  # No extension on Linux
 }
 
-# Template file paths
-def get_template_path() -> str:
-    """Get the path to template files based on execution context."""
-    # Check for development environment
-    if os.path.exists(os.path.join(os.path.dirname(__file__), "../../templates")):
-        return os.path.join(os.path.dirname(__file__), "../../templates")
-    
-    # When running as a package
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "../templates")
-
-LAUNCHER_TEMPLATE_PATH = os.path.join(get_template_path(), "launcher_template.py")
-
 # Config storage paths
 def get_config_dir() -> str:
     """Get the path to user config directory."""

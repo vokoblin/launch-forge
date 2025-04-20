@@ -2,6 +2,7 @@
 """
 Build script for LaunchForge application.
 Creates executables for Windows, macOS, and Linux.
+Uses a template-based approach with a direct .spec file template.
 """
 
 import os
@@ -9,6 +10,9 @@ import sys
 import shutil
 import platform
 import subprocess
+import re
+
+from src.models.constants import APP_VERSION
 
 
 def run_command(command, check=True):
@@ -26,122 +30,107 @@ def get_path_separator():
     return ";" if platform.system() == "Windows" else ":"
 
 
-def build_windows():
-    """Build Windows executable"""
-    print("\n=== Building for Windows ===\n")
+def generate_spec_file(output_name: str):
+    """Create a spec file from template"""
+    print(f"Creating spec file from template...")
 
-    # Check if running on Windows
-    if platform.system() != "Windows":
-        print("Warning: Building Windows executable on non-Windows platform")
+    main_file = find_main_file()
+    path_sep = get_path_separator()
 
-    # Create platform-specific build folder with proper Windows paths
-    platform_dir = os.path.join("dist", "windows")
-    os.makedirs(platform_dir, exist_ok=True)
-
-    # Ensure resources directory exists
-    os.makedirs("resources", exist_ok=True)
-
-    # Build with PyInstaller
+    # Generate a temporary basic spec file to extract data paths
+    temp_spec_name = f"temp_{output_name}"
     cmd = [
-        "pyinstaller",
+        "pyi-makespec",
+        "--name", temp_spec_name,
         "--onefile",
         "--windowed",
-        "--clean",
-        "--name", "LaunchForge",
-        "--distpath", platform_dir
+        "--add-data", f"templates/bin{path_sep}templates",
+        "--add-data", f"resources{path_sep}resources",
+        "--icon", "resources/icons/app_icon.png",
+        main_file
     ]
+    run_command(cmd)
 
-    # Only add resources if directory is not empty
-    if os.path.exists("resources") and os.listdir("resources"):
-        cmd.extend(["--add-data", f"resources{get_path_separator()}resources"])
+    # Read the generated spec file to extract necessary info
+    temp_spec_path = f"{temp_spec_name}.spec"
+    with open(temp_spec_path, "r") as f:
+        orig_spec = f.read()
 
-    cmd.append(find_main_file())
+    # Extract the datas paths using regex
+    datas_match = re.search(r'datas=\[(.*?)]', orig_spec, re.DOTALL)
+    datas_content = datas_match.group(1)
 
-    # Check if icon exists
-    if os.path.exists("resources/icons/app_icon.ico"):
-        cmd.extend(["--icon", "resources/icons/app_icon.ico"])
-    elif os.path.exists("resources/icons/app_icon.png"):
-        print("Warning: No .ico file found, using .png")
-        cmd.extend(["--icon", "resources/icons/app_icon.png"])
+    # Extract the icon path using regex
+    icon_match = re.search(r"icon=\[(.*?)]", orig_spec, re.DOTALL)
+    icon_content = icon_match.group(1)
+
+    # Delete the temporary spec file
+    os.remove(temp_spec_path)
+
+    # Read the template
+    with open("templates/launch_forge_spec_template.spec", "r") as f:
+        template_content = f.read()
+
+    # Replace placeholders
+    spec_content = template_content.replace("{main_file}", main_file)
+    spec_content = spec_content.replace("{output_name}", output_name)
+    spec_content = spec_content.replace("{datas}", datas_content)
+    spec_content = spec_content.replace("{icon_path}", icon_content.strip("'"))
+
+    # Write the new spec file
+    spec_path = f"{output_name}.spec"
+    with open(spec_path, "w") as f:
+        f.write(spec_content)
+
+    print(f"Created spec file from template: {spec_path}")
+    return spec_path
+
+
+def build_for_platform(target_platform: str):
+    """Build executable for given platform"""
+    print(f"\n=== Building for {target_platform} ===\n")
+
+    # Check if running on target platform
+    current_platform = platform.system()
+    if current_platform != target_platform and not (current_platform == "Darwin" and target_platform == "Macos"):
+        print(f"Warning: Building {target_platform} executable on non-{target_platform} platform")
+
+    output_name = f"LaunchForge-{target_platform}-v{APP_VERSION}"
+
+    # Create customized spec file from template
+    spec_file = generate_spec_file(output_name)
+
+    # Build using the spec file
+    cmd = ["pyinstaller", "--clean", spec_file]
 
     try:
         run_command(cmd)
-        print(f"Windows executable created: {platform_dir}/LaunchForge.exe")
+
+        output_path = f"dist/{output_name}"
+
+        # Define expected output paths based on platform
+        if target_platform == "Windows":
+            exe_output_path = f"{output_path}.exe"
+            # If .exe doesn't exist but base does, rename it
+            if not os.path.exists(exe_output_path) and os.path.exists(output_path):
+                os.rename(output_path, exe_output_path)
+                print(f"Renamed {output_path} to {exe_output_path}")
+                output_path = exe_output_path
+            else:
+                output_path = exe_output_path
+
+        if os.path.exists(output_path):
+            if platform.system() != "Windows":
+                os.chmod(output_path, 0o755)
+            print(f"{target_platform} executable created: {output_path}")
+        else:
+            print(f"Warning: Expected output file not found: {output_path}")
+            return False
     except Exception as e:
-        print(f"Error building Windows executable: {e}")
+        print(f"Error building {target_platform} executable: {e}")
+        return False
 
-
-def build_linux():
-    """Build Linux executable"""
-    print("\n=== Building for Linux ===\n")
-
-    # Check if running on Linux
-    if platform.system() != "Linux":
-        print("Warning: Building Linux executable on non-Linux platform")
-
-    # Create platform-specific build folder
-    platform_dir = "dist/linux"
-    os.makedirs(platform_dir, exist_ok=True)
-
-    # Build with PyInstaller
-    cmd = [
-        "pyinstaller",
-        "--onefile",
-        "--windowed",
-        "--clean",
-        "--name", "LaunchForge",
-        "--distpath", platform_dir,
-        "--add-data", f"resources{get_path_separator()}resources",
-        find_main_file()
-    ]
-
-    # Check if icon exists
-    if os.path.exists("resources/icons/app_icon.png"):
-        cmd.extend(["--icon", "resources/icons/app_icon.png"])
-
-    run_command(cmd)
-
-    # Make executable
-    os.chmod(f"{platform_dir}/LaunchForge", 0o755)
-    print(f"Linux executable created: {platform_dir}/LaunchForge")
-
-
-def build_macos():
-    """Build macOS executable"""
-    print("\n=== Building for macOS ===\n")
-
-    # Check if running on macOS
-    if platform.system() != "Darwin":
-        print("Warning: Building macOS executable on non-macOS platform")
-
-    # Create platform-specific build folder
-    platform_dir = "dist/macos"
-    os.makedirs(platform_dir, exist_ok=True)
-
-    # Build with PyInstaller
-    cmd = [
-        "pyinstaller",
-        "--onefile",
-        "--windowed",
-        "--clean",
-        "--name", "LaunchForge",
-        "--distpath", platform_dir,
-        "--add-data", f"resources{get_path_separator()}resources",
-        find_main_file()
-    ]
-
-    # Check if icon exists
-    if os.path.exists("resources/icons/app_icon.icns"):
-        cmd.extend(["--icon", "resources/icons/app_icon.icns"])
-    elif os.path.exists("resources/icons/app_icon.png"):
-        print("Warning: No .icns file found, using .png")
-        cmd.extend(["--icon", "resources/icons/app_icon.png"])
-
-    run_command(cmd)
-
-    # Make executable
-    os.chmod(f"{platform_dir}/LaunchForge", 0o755)
-    print(f"macOS executable created: {platform_dir}/LaunchForge")
+    return True
 
 
 def find_main_file():
@@ -166,49 +155,45 @@ def clean_build_files():
         shutil.rmtree("build")
         print("Removed build directory")
 
-    # Remove spec file
-    spec_file = "LaunchForge.spec"
-    if os.path.exists(spec_file):
-        os.remove(spec_file)
-        print(f"Removed {spec_file}")
+    # Remove spec files
+    spec_files = [
+        f"LaunchForge-Windows-v{APP_VERSION}.spec",
+        f"LaunchForge-Linux-v{APP_VERSION}.spec",
+        f"LaunchForge-Macos-v{APP_VERSION}.spec"
+    ]
+
+    for spec_file in spec_files:
+        if os.path.exists(spec_file):
+            os.remove(spec_file)
+            print(f"Removed {spec_file}")
 
 
 def main():
     """Main function"""
-    # Initial cleanup of old dist directory
-    if os.path.exists("dist"):
-        shutil.rmtree("dist")
-
-    # Create the dist directory
-    os.makedirs("dist", exist_ok=True)
-
-    # Detect platform and build for it
-    current_platform = platform.system()
-
     if len(sys.argv) > 1:
         # Build for specified platforms
         platforms = sys.argv[1:]
+        success = True
+
         for p in platforms:
-            if p.lower() == "windows":
-                build_windows()
-            elif p.lower() == "linux":
-                build_linux()
-            elif p.lower() == "macos":
-                build_macos()
+            if p.lower() in ["windows", "linux", "macos"]:
+                if not build_for_platform(p.capitalize()):
+                    success = False
             else:
                 print(f"Unknown platform: {p}")
                 continue  # Skip unknown platforms but continue with others
 
             # Clean up build directories and temporary files after each build
             clean_build_files()
+
+        if not success:
+            return 1
     else:
         # If no platform specified, build for current platform
-        if current_platform == "Windows":
-            build_windows()
-        elif current_platform == "Linux":
-            build_linux()
-        elif current_platform == "Darwin":
-            build_macos()
+        current_platform = platform.system()
+        if current_platform in ["Windows", "Linux", "Darwin"]:
+            if not build_for_platform(current_platform.replace('Darwin', 'Macos')):
+                return 1
         else:
             print(f"Unsupported platform: {current_platform}")
             return 1
@@ -217,10 +202,10 @@ def main():
         clean_build_files()
 
     print("\n=== Build Complete ===\n")
-    print("Built executables are in platform-specific directories under dist/:")
-    print("  - Windows: dist/windows/LaunchForge.exe")
-    print("  - Linux:   dist/linux/LaunchForge")
-    print("  - macOS:   dist/macos/LaunchForge")
+    print("Built executables are in the dist directory:")
+    print(f"  - Windows: dist/LaunchForge-Windows-v{APP_VERSION}.exe")
+    print(f"  - Linux:   dist/LaunchForge-Linux-v{APP_VERSION}")
+    print(f"  - macOS:   dist/LaunchForge-Macos-v{APP_VERSION}")
 
     return 0
 

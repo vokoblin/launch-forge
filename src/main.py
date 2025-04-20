@@ -15,7 +15,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.ui.main_window import MainWindow
 from src.models.constants import APP_NAME, APP_VERSION, CONFIG_DIR_PATH, ICON_DIR_PATH
-from src.utils.system_utils import is_pyinstaller_available
 from src.ui.styles import setup_styles, setup_dark_theme
 
 # Configure logging
@@ -65,13 +64,6 @@ def parse_arguments():
 
     return parser.parse_args()
 
-def check_requirements():
-    """Check if all requirements are met."""
-    # Check if PyInstaller is available
-    if not is_pyinstaller_available():
-        return False, "PyInstaller is not installed. Please install it with 'pip install pyinstaller'."
-    return True, ""
-
 def main():
     """Main application entry point."""
     # Set up logging
@@ -93,12 +85,6 @@ def main():
     # Set application icon if available
     if os.path.exists(os.path.join(ICON_DIR_PATH, "app_icon.png")):
         app.setWindowIcon(QIcon(os.path.join(ICON_DIR_PATH, "app_icon.png")))
-
-    # Check requirements
-    requirements_met, error_message = check_requirements()
-    if not requirements_met:
-        QMessageBox.critical(None, "Requirements Error", error_message)
-        return 1
 
     # Apply theme
     if args.theme == "dark":

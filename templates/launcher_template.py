@@ -28,70 +28,57 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer, QObject
 from PyQt5.QtGui import QIcon, QFont, QTextCursor
 
-from src.models.constants import APP_NAME
+# Config data marker - used to locate embedded configuration
+CONFIG_MARKER_START = b"<<<LAUNCHFORGE_CONFIG_START>>>"
+CONFIG_MARKER_END = b"<<<LAUNCHFORGE_CONFIG_END>>>"
 
 
-# Load configuration
-def load_config():
+def extract_embedded_config():
     """
-    Load launcher configuration from external file or embedded resource.
+    Extract configuration data embedded in the executable file.
 
     Returns:
-        dict: Configuration dictionary
+        dict: The extracted configuration dictionary, or None if not found
     """
     logger = logging.getLogger(__name__)
-    config_file = "launcher_config.json"
+    logger.debug("Attempting to extract embedded configuration")
 
-    # Check if running as bundled executable
-    if getattr(sys, 'frozen', False):
-        # Check for config next to the executable first
-        exe_dir = os.path.dirname(sys.executable)
-        config_path = os.path.join(exe_dir, config_file)
+    try:
+        # Get path to the executable
+        exe_path = sys.executable
+        logger.debug(f"Executable path: {exe_path}")
 
-        if os.path.exists(config_path):
-            logger.info(f"Loading configuration from: {config_path}")
-            try:
-                with open(config_path, 'r') as f:
-                    return json.load(f)
-            except Exception as e:
-                logger.error(f"Error loading external config: {e}")
+        # Read the executable file in binary mode
+        with open(exe_path, 'rb') as f:
+            content = f.read()
 
-        # Try to load from embedded resource
-        try:
-            # Get the path to the embedded resource
-            if hasattr(sys, '_MEIPASS'):
-                resource_path = os.path.join(sys._MEIPASS, config_file)
-                if os.path.exists(resource_path):
-                    logger.info(f"Loading embedded configuration from: {resource_path}")
-                    with open(resource_path, 'r') as f:
-                        return json.load(f)
-        except Exception as e:
-            logger.error(f"Error loading embedded config: {e}")
-    else:
-        # In development mode, check current directory
-        if os.path.exists(config_file):
-            logger.info(f"Loading development configuration from: {config_file}")
-            try:
-                with open(config_file, 'r') as f:
-                    return json.load(f)
-            except Exception as e:
-                logger.error(f"Error loading development config: {e}")
+        # Find the markers
+        start_idx = content.find(CONFIG_MARKER_START)
+        if start_idx == -1:
+            logger.debug("Start marker not found in executable")
+            return None
 
-    # Fallback to default configuration
-    logger.warning("Using default configuration")
-    return {
-        "name": "Default Game Mod Launcher",
-        "description": "Default configuration - please provide a valid config file",
-        "game_exe": "game.exe",
-        "mods": [],
-        "validation_files": ["game.exe"],
-        "default_locations": [],
-        "version": "1.0.0"
-    }
+        end_idx = content.find(CONFIG_MARKER_END, start_idx)
+        if end_idx == -1:
+            logger.debug("End marker not found in executable")
+            return None
+
+        # Extract the JSON data
+        start_data_idx = start_idx + len(CONFIG_MARKER_START)
+        config_data = content[start_data_idx:end_idx].decode('utf-8')
+
+        # Parse the JSON data
+        config = json.loads(config_data)
+        logger.info("Successfully extracted embedded configuration")
+        return config
+
+    except Exception as e:
+        logger.error(f"Error extracting embedded configuration: {e}")
+        return None
 
 
 # Load the configuration
-CONFIG = load_config()
+CONFIG = extract_embedded_config()
 
 
 # Get OS-specific app data directory
@@ -261,7 +248,7 @@ class AboutDialog(QDialog):
         <ul>
         {"".join(f"<li>{mod['name']}</li>" for mod in CONFIG.get("mods", []))}
         </ul>
-        <p>Created with {APP_NAME}</p>
+        <p>Created with {CONFIG.get("created_with")}</p>
         """)
         layout.addWidget(info)
 

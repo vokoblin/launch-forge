@@ -4,14 +4,12 @@ on:
   push:
     tags:
       - 'v*' # Run on version tags (v1.0.0, etc.)
-    branches:
-      - main # Optional: also build on pushes to main branch
   workflow_dispatch: # Allow manual triggering
 
 jobs:
   build:
-    name: Build All Platforms
-    runs-on: ubuntu-latest # Use Ubuntu for building all platforms
+    name: Build Linux and macOS
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
@@ -25,7 +23,6 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pyinstaller
           pip install -r requirements.txt
           # Install dependencies needed for PyQt5/xcb
           sudo apt-get update
@@ -40,13 +37,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: LaunchForge-Linux
-          path: dist/linux/LaunchForge
+          path: dist/LaunchForge-Linux-v*
 
       - name: Upload macOS executable
         uses: actions/upload-artifact@v4
         with:
-          name: LaunchForge-MacOS
-          path: dist/macos/LaunchForge
+          name: LaunchForge-Macos
+          path: dist/LaunchForge-Macos-v*
 
   build-windows:
     name: Build Windows
@@ -64,7 +61,6 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pyinstaller==6.1.0
           pip install -r requirements.txt
 
       - name: Run build script
@@ -76,13 +72,15 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: LaunchForge-Windows
-          path: dist/windows/LaunchForge.exe
+          path: dist/LaunchForge-Windows-v*.exe
 
   release:
     name: Create GitHub Release
     needs: [build, build-windows]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -95,6 +93,7 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            LaunchForge-Windows/LaunchForge.exe
-            LaunchForge-Linux/LaunchForge
-            LaunchForge-MacOS/LaunchForge
+            LaunchForge-Windows/LaunchForge-Windows-v*.exe
+            LaunchForge-Linux/LaunchForge-Linux-v*
+            LaunchForge-Macos/LaunchForge-Macos-v*
+          token: ${{ secrets.GITHUB_TOKEN }}
