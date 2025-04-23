@@ -68,7 +68,7 @@ LaunchForge is an all-in-one solution for game modders who want to distribute th
 
 ### Pre-built Binaries
 
-Pre-built executables are available for Windows, macOS, and Linux in the [Releases](https://github.com/your-username/launch-forge/releases) section.
+Pre-built executables are available for Windows, macOS, and Linux in the [Releases](https://github.com/vokoblin/launch-forge/releases) section.
 
 ## Building From Source
 
@@ -148,15 +148,16 @@ python main.py --config my_config.json --theme dark
 
 ```
 launch-forge/
+├── .github/workflows/          # GitHub Actions workflows
+├── resources/                  # Application resources
+│   └── icons/                  # UI icons
 ├── src/                        # Source code
 │   ├── builder/                # Builder logic
 │   ├── models/                 # Data models
 │   ├── utils/                  # Utility functions
 │   └── ui/                     # User interface
-├── resources/                  # Application resources
-│   ├── icons/                  # UI icons
-│   └── templates/              # Template files
-├── .github/workflows/          # GitHub Actions workflows
+├── templates/                  # Template files
+│   └── bin/                    # Pre-built launcher template files
 ├── build.py                    # Local build script
 └── requirements.txt            # Project dependencies
 ```
